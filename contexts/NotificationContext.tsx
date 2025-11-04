@@ -2,7 +2,8 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import createContextHook from "@nkzw/create-context-hook";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { router } from "expo-router";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -20,6 +21,8 @@ const DEFAULT_REMINDER_TIME = "15:40";
 export const [NotificationProvider, useNotifications] = createContextHook(() => {
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [reminderTime, setReminderTime] = useState(DEFAULT_REMINDER_TIME);
+  const notificationListener = useRef<Notifications.EventSubscription | undefined>(undefined);
+  const responseListener = useRef<Notifications.EventSubscription | undefined>(undefined);
 
   const registerForPushNotifications = useCallback(async () => {
     if (Platform.OS === "web") {
@@ -110,6 +113,24 @@ export const [NotificationProvider, useNotifications] = createContextHook(() => 
   useEffect(() => {
     registerForPushNotifications();
     loadReminderTime();
+
+    if (Platform.OS === "web") {
+      return;
+    }
+
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      console.log("Notification received:", notification);
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log("Notification tapped:", response);
+      router.push("/daily");
+    });
+
+    return () => {
+      notificationListener.current?.remove();
+      responseListener.current?.remove();
+    };
   }, [registerForPushNotifications, loadReminderTime]);
 
   useEffect(() => {
