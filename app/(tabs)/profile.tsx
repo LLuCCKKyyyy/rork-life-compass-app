@@ -20,6 +20,7 @@ import Colors from "@/constants/colors";
 import { useTasks } from "@/contexts/TasksContext";
 import { useGratitude } from "@/contexts/GratitudeContext";
 import { useRelationships } from "@/contexts/RelationshipsContext";
+import { useNotifications } from "@/contexts/NotificationContext";
 
 type ReviewType = "weekly" | "monthly" | "yearly";
 
@@ -253,14 +254,21 @@ export default function ProfileScreen() {
   const { tasks, bigRocks } = useTasks();
   const { entries, reviews } = useGratitude();
   const { people } = useRelationships();
+  const { reminderTime: contextReminderTime, scheduleDailyGratitudeReminder } = useNotifications();
   const [showAddReview, setShowAddReview] = useState(false);
   const [showReminderSettings, setShowReminderSettings] = useState(false);
-  const [reminderTime, setReminderTime] = useState("15:14");
+  const [reminderTime, setReminderTime] = useState("15:40");
   const router = useRouter();
 
   useEffect(() => {
     loadReminderTime();
   }, []);
+
+  useEffect(() => {
+    if (contextReminderTime) {
+      setReminderTime(contextReminderTime);
+    }
+  }, [contextReminderTime]);
 
   const loadReminderTime = async () => {
     try {
@@ -277,6 +285,8 @@ export default function ProfileScreen() {
     try {
       await AsyncStorage.setItem(REMINDER_TIME_KEY, time);
       setReminderTime(time);
+      await scheduleDailyGratitudeReminder(time);
+      console.log("Reminder time saved and notification rescheduled:", time);
     } catch (error) {
       console.log("Error saving reminder time:", error);
     }

@@ -1,5 +1,6 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import createContextHook from "@nkzw/create-context-hook";
 import { useEffect, useState, useCallback, useMemo } from "react";
 
@@ -13,8 +14,12 @@ Notifications.setNotificationHandler({
   }),
 });
 
+const REMINDER_TIME_KEY = "life-compass-reminder-time";
+const DEFAULT_REMINDER_TIME = "15:40";
+
 export const [NotificationProvider, useNotifications] = createContextHook(() => {
   const [permissionGranted, setPermissionGranted] = useState(false);
+  const [reminderTime, setReminderTime] = useState(DEFAULT_REMINDER_TIME);
 
   const registerForPushNotifications = useCallback(async () => {
     if (Platform.OS === "web") {
@@ -46,17 +51,35 @@ export const [NotificationProvider, useNotifications] = createContextHook(() => 
     }
   }, []);
 
-  const scheduleDailyGratitudeReminder = useCallback(async () => {
+  const loadReminderTime = useCallback(async () => {
     if (Platform.OS === "web") {
       return;
     }
 
     try {
+      const stored = await AsyncStorage.getItem(REMINDER_TIME_KEY);
+      const time = stored || DEFAULT_REMINDER_TIME;
+      setReminderTime(time);
+      console.log("Loaded reminder time:", time);
+    } catch (error) {
+      console.error("Error loading reminder time:", error);
+    }
+  }, []);
+
+  const scheduleDailyGratitudeReminder = useCallback(async (time?: string) => {
+    if (Platform.OS === "web") {
+      return;
+    }
+
+    try {
+      const timeToUse = time || reminderTime;
+      const [hours, minutes] = timeToUse.split(":").map(Number);
+
       await Notifications.cancelAllScheduledNotificationsAsync();
 
       const now = new Date();
       const scheduledTime = new Date();
-      scheduledTime.setHours(15, 14, 0, 0);
+      scheduledTime.setHours(hours, minutes, 0, 0);
 
       if (now >= scheduledTime) {
         scheduledTime.setDate(scheduledTime.getDate() + 1);
@@ -70,26 +93,35 @@ export const [NotificationProvider, useNotifications] = createContextHook(() => 
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-          hour: 15,
-          minute: 14,
+          hour: hours,
+          minute: minutes,
           repeats: true,
         },
       });
 
-      console.log("Daily gratitude reminder scheduled for 3:14 PM");
+      const hourLabel = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+      const period = hours >= 12 ? "PM" : "AM";
+      console.log(`Daily gratitude reminder scheduled for ${hourLabel}:${minutes.toString().padStart(2, "0")} ${period}`);
     } catch (error) {
       console.error("Error scheduling notification:", error);
     }
-  }, []);
+  }, [reminderTime]);
 
   useEffect(() => {
     registerForPushNotifications();
-    scheduleDailyGratitudeReminder();
-  }, [registerForPushNotifications, scheduleDailyGratitudeReminder]);
+    loadReminderTime();
+  }, [registerForPushNotifications, loadReminderTime]);
+
+  useEffect(() => {
+    if (reminderTime) {
+      scheduleDailyGratitudeReminder();
+    }
+  }, [reminderTime, scheduleDailyGratitudeReminder]);
 
   return useMemo(() => ({
     permissionGranted,
+    reminderTime,
     registerForPushNotifications,
     scheduleDailyGratitudeReminder,
-  }), [permissionGranted, registerForPushNotifications, scheduleDailyGratitudeReminder]);
+  }), [permissionGranted, reminderTime, registerForPushNotifications, scheduleDailyGratitudeReminder]);
 });
