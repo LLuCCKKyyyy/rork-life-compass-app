@@ -111,30 +111,28 @@ export const [NotificationProvider, useNotifications] = createContextHook(() => 
   }, [reminderTime]);
 
   useEffect(() => {
-    registerForPushNotifications();
-    loadReminderTime();
+    if (Platform.OS !== "web") {
+      registerForPushNotifications();
+      loadReminderTime();
 
-    if (Platform.OS === "web") {
-      return;
+      notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+        console.log("Notification received:", notification);
+      });
+
+      responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+        console.log("Notification tapped:", response);
+        router.push("/daily");
+      });
+
+      return () => {
+        notificationListener.current?.remove();
+        responseListener.current?.remove();
+      };
     }
-
-    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      console.log("Notification received:", notification);
-    });
-
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log("Notification tapped:", response);
-      router.push("/daily");
-    });
-
-    return () => {
-      notificationListener.current?.remove();
-      responseListener.current?.remove();
-    };
   }, [registerForPushNotifications, loadReminderTime]);
 
   useEffect(() => {
-    if (reminderTime) {
+    if (Platform.OS !== "web" && reminderTime) {
       scheduleDailyGratitudeReminder();
     }
   }, [reminderTime, scheduleDailyGratitudeReminder]);
