@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
 import {
   StyleSheet,
@@ -13,7 +13,8 @@ import {
   KeyboardAvoidingView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Plus, X, TrendingUp, Calendar, Heart, Target, Sparkles } from "lucide-react-native";
+import { Plus, X, TrendingUp, Calendar, Heart, Target, Sparkles, Bell } from "lucide-react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import Colors from "@/constants/colors";
 import { useTasks } from "@/contexts/TasksContext";
@@ -21,6 +22,95 @@ import { useGratitude } from "@/contexts/GratitudeContext";
 import { useRelationships } from "@/contexts/RelationshipsContext";
 
 type ReviewType = "weekly" | "monthly" | "yearly";
+
+function ReminderSettingsModal({
+  visible,
+  onClose,
+  currentTime,
+  onSave,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  currentTime: string;
+  onSave: (time: string) => void;
+}) {
+  const [hours, setHours] = useState(currentTime.split(":")[0]);
+  const [minutes, setMinutes] = useState(currentTime.split(":")[1]);
+
+  const handleSave = () => {
+    const h = parseInt(hours) || 0;
+    const m = parseInt(minutes) || 0;
+    
+    if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+      const formattedTime = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+      onSave(formattedTime);
+      onClose();
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      >
+        <Pressable style={styles.modalOverlayInner} onPress={onClose}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Daily Reminder Time</Text>
+              <TouchableOpacity onPress={onClose}>
+                <X size={24} color={Colors.light.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.timeInputContainer}>
+              <View style={styles.timeInputGroup}>
+                <Text style={styles.timeLabel}>Hour (0-23)</Text>
+                <TextInput
+                  style={styles.timeInput}
+                  value={hours}
+                  onChangeText={setHours}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                  placeholderTextColor={Colors.light.tertiaryText}
+                />
+              </View>
+              <Text style={styles.timeSeparator}>:</Text>
+              <View style={styles.timeInputGroup}>
+                <Text style={styles.timeLabel}>Minute (0-59)</Text>
+                <TextInput
+                  style={styles.timeInput}
+                  value={minutes}
+                  onChangeText={setMinutes}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                  placeholderTextColor={Colors.light.tertiaryText}
+                />
+              </View>
+            </View>
+
+            <Text style={styles.reminderNote}>
+              You&apos;ll receive a notification at this time every day to reflect on your gratitude.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.submitButton}
+              onPress={handleSave}
+            >
+              <Text style={styles.submitButtonText}>Save Reminder Time</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
 
 function AddReviewModal({
   visible,
@@ -156,13 +246,41 @@ function AddReviewModal({
   );
 }
 
+const REMINDER_TIME_KEY = "life-compass-reminder-time";
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { tasks, bigRocks } = useTasks();
   const { entries, reviews } = useGratitude();
   const { people } = useRelationships();
   const [showAddReview, setShowAddReview] = useState(false);
+  const [showReminderSettings, setShowReminderSettings] = useState(false);
+  const [reminderTime, setReminderTime] = useState("15:14");
   const router = useRouter();
+
+  useEffect(() => {
+    loadReminderTime();
+  }, []);
+
+  const loadReminderTime = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(REMINDER_TIME_KEY);
+      if (stored) {
+        setReminderTime(stored);
+      }
+    } catch (error) {
+      console.log("Error loading reminder time:", error);
+    }
+  };
+
+  const saveReminderTime = async (time: string) => {
+    try {
+      await AsyncStorage.setItem(REMINDER_TIME_KEY, time);
+      setReminderTime(time);
+    } catch (error) {
+      console.log("Error saving reminder time:", error);
+    }
+  };
 
   const completedTasks = tasks.filter((t) => t.completed).length;
   const totalTasks = tasks.length;
@@ -260,6 +378,25 @@ export default function ProfileScreen() {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Daily Reminder</Text>
+            <TouchableOpacity onPress={() => setShowReminderSettings(true)}>
+              <Bell size={20} color={Colors.light.primary} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.reminderCard}>
+            <Bell size={24} color={Colors.light.accent} />
+            <View style={styles.reminderInfo}>
+              <Text style={styles.reminderTitle}>Gratitude Reminder</Text>
+              <Text style={styles.reminderTime}>
+                Every day at {reminderTime.split(":")[0]}:{reminderTime.split(":")[1]}
+                {parseInt(reminderTime.split(":")[0]) >= 12 ? " PM" : " AM"}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Reviews & Reflections</Text>
             <TouchableOpacity onPress={() => setShowAddReview(true)}>
               <Plus size={20} color={Colors.light.primary} />
@@ -308,6 +445,13 @@ export default function ProfileScreen() {
       <AddReviewModal
         visible={showAddReview}
         onClose={() => setShowAddReview(false)}
+      />
+
+      <ReminderSettingsModal
+        visible={showReminderSettings}
+        onClose={() => setShowReminderSettings(false)}
+        currentTime={reminderTime}
+        onSave={saveReminderTime}
       />
     </View>
   );
@@ -603,5 +747,62 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "600" as const,
     color: Colors.light.background,
+  },
+  reminderCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    paddingVertical: 12,
+  },
+  reminderInfo: {
+    flex: 1,
+  },
+  reminderTitle: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: Colors.light.text,
+    marginBottom: 4,
+  },
+  reminderTime: {
+    fontSize: 14,
+    color: Colors.light.secondaryText,
+  },
+  timeInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    marginBottom: 24,
+  },
+  timeInputGroup: {
+    alignItems: "center",
+  },
+  timeLabel: {
+    fontSize: 13,
+    color: Colors.light.secondaryText,
+    marginBottom: 8,
+  },
+  timeInput: {
+    width: 80,
+    backgroundColor: Colors.light.secondaryBackground,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 24,
+    fontWeight: "600" as const,
+    color: Colors.light.text,
+    textAlign: "center",
+  },
+  timeSeparator: {
+    fontSize: 32,
+    fontWeight: "700" as const,
+    color: Colors.light.text,
+    marginTop: 20,
+  },
+  reminderNote: {
+    fontSize: 14,
+    color: Colors.light.secondaryText,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 24,
   },
 });
