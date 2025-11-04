@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { TasksProvider } from "@/contexts/TasksContext";
 import { GratitudeProvider } from "@/contexts/GratitudeContext";
 import { RelationshipsProvider } from "@/contexts/RelationshipsContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -30,15 +31,17 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TasksProvider>
-        <GratitudeProvider>
-          <RelationshipsProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <RootLayoutNav />
-            </GestureHandlerRootView>
-          </RelationshipsProvider>
-        </GratitudeProvider>
-      </TasksProvider>
+      <NotificationProvider>
+        <TasksProvider>
+          <GratitudeProvider>
+            <RelationshipsProvider>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <RootLayoutNav />
+              </GestureHandlerRootView>
+            </RelationshipsProvider>
+          </GratitudeProvider>
+        </TasksProvider>
+      </NotificationProvider>
     </QueryClientProvider>
   );
 }
